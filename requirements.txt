@@ -1,0 +1,8 @@
+torch
+torchvision
+opencv-python
+pillow
+numpy
+scipy
+mmseg
+mmcv

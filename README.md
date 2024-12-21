@@ -5,6 +5,17 @@ Cooperative palmprint recognition, pivotal for civilian and commercial uses, sta
 #### Citation
 If our work is valuable to you, please cite our work:
 ```
+@ARTICLE{10795182,
+  author={Chai, Tingting and Wang, Xin and Li, Ru and Jia, Wei and Wu, Xiangqian},
+  journal={IEEE Transactions on Information Forensics and Security}, 
+  title={Joint Finger Valley Points-Free ROI Detection and Recurrent Layer Aggregation for Palmprint Recognition in Open Environment}, 
+  year={2024},
+  volume={},
+  number={},
+  pages={1-1},
+  keywords={Palmprint recognition;Feature extraction;Accuracy;Image segmentation;Training;Annotations;Representation learning;Manuals;Location awareness;Lighting;Palmprint recognition;Palm ROI detection;Recurrent layer aggregation;Angular center proximity loss},
+  doi={10.1109/TIFS.2024.3516539}}
+
 ```
 #### Requirements
 Our codes were implemented by ```PyTorch 2.3.0``` and ```12.1``` CUDA version. If you wanna try our method, please first install necessary packages as follows:

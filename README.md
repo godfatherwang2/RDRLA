@@ -20,7 +20,7 @@ If our work is valuable to you, please cite our work:
 #### Requirements
 Our codes were implemented by ```PyTorch 2.3.0``` and ```12.1``` CUDA version. If you wanna try our method, please first install necessary packages as follows:
 ```
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 #### Pretrained Model
 Readers can send an email to the authors of the paper to obtain the dataset mentioned in the text as well as the pretrained weights of RLANN for experimental comparison.

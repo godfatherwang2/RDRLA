@@ -17,12 +17,8 @@ If our work is valuable to you, please cite our work:
   doi={10.1109/TIFS.2024.3516539}}
 ```
 #### DataSet
-
-ROI of HIT-NIST-V1 Palmprint DataSet
-[Click here to download the dataset]()
-ROI of BJTU\_PalmV2 Palmprint DataSet
-[Click here to download the dataset]()
-
+[ROI of HIT-NIST-V1 Palmprint DataSet]()
+[ROI of BJTU\_PalmV2 Palmprint DataSet]()
 1. **Non-commercial Use Only**: This dataset is intended for non-commercial purposes only, such as academic research. It is strictly prohibited to use the dataset for any commercial purposes without permission, including but not limited to the development of commercial products and the provision of commercial services.
 2. **Citation Requirement**: If you use this dataset in your research, please make sure to cite this paper in your research outputs (such as academic papers, technical reports, etc.).
 #### Requirements

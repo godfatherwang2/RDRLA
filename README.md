@@ -15,20 +15,24 @@ If our work is valuable to you, please cite our work:
   pages={1-1},
   keywords={Palmprint recognition;Feature extraction;Accuracy;Image segmentation;Training;Annotations;Representation learning;Manuals;Location awareness;Lighting;Palmprint recognition;Palm ROI detection;Recurrent layer aggregation;Angular center proximity loss},
   doi={10.1109/TIFS.2024.3516539}}
-
 ```
+#### DataSet
+
+ROI of HIT-NIST-V1 Palmprint DataSet
+[Click here to download the dataset]()
+ROI of BJTU\_PalmV2 Palmprint DataSet
+[Click here to download the dataset]()
+
+1. **Non-commercial Use Only**: This dataset is intended for non-commercial purposes only, such as academic research. It is strictly prohibited to use the dataset for any commercial purposes without permission, including but not limited to the development of commercial products and the provision of commercial services.
+2. **Citation Requirement**: If you use this dataset in your research, please make sure to cite this paper in your research outputs (such as academic papers, technical reports, etc.).
 #### Requirements
 Our codes were implemented by ```PyTorch 2.3.0``` and ```12.1``` CUDA version. If you wanna try our method, please first install necessary packages as follows:
 ```
 pip install -r requirements.txt
 ```
 #### Pretrained Model
-Readers can send an email to the authors of the paper to obtain the dataset mentioned in the text as well as the pretrained weights of RLANN for experimental comparison.
-#### Training
-After preparing well, you can directly run our training code as follows:
-```
-python palmprint_recognition/eval_script.py
-```
+The pretrained weights of RLANN for experimental comparison can be downloaded [here](https://drive.google.com/drive/folders/150fjxnRljHuS_kUfwS1QLgzCe4Xuy-dH?usp=sharing). You can use it for training on your own dataset following hyperparameter settings in palmprint_recognition/eval_script.py
+
 #### Acknowledgments
 Thanks to my all cooperators, they contributed so much to this work.
 

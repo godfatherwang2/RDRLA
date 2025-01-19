@@ -1,31 +1,45 @@
-import cv2
-import numpy as np
 import torch
-from adaptive_PROIE.LANet import LAnet
-import math
+import time
+from torch.utils.data import DataLoader
+import torch.nn as nn
+from models import LAnet
 import os
+from torchvision import transforms
+from PIL import Image
+import numpy as np
+import cv2
+import torch.nn.functional as F
+import warnings
+import math
+import tqdm
+import warnings
+from utills import *
+warnings.filterwarnings("ignore", category=UserWarning)
 
-save_dir = ''
+def generate_heatmap(keypoint_location, heatmap_size, variance):
+    x, y = keypoint_location
+    x_range = torch.arange(0, heatmap_size[1], 1)
+    y_range = torch.arange(0, heatmap_size[0], 1)
+    X, Y = torch.meshgrid(x_range, y_range)
+    pos = torch.stack((X, Y), dim=2)
+    heatmap = torch.exp(-(torch.sum((pos - torch.tensor([x, y]))**2, dim=2)) / (2.0 * variance**2))
+    return heatmap
 
-def center_and_pad_image(input_img_cv2):
+def center_and_pad_image(input_img_cv2,kpts):
     height, width, _ = input_img_cv2.shape
     new_size = int(max(width, height))
     x_offset = (new_size - width) // 2
     y_offset = (new_size - height) // 2
     padded_image = np.zeros((new_size, new_size, 3), dtype=np.uint8)
     padded_image[y_offset:y_offset + height, x_offset:x_offset + width, :] = input_img_cv2
-    return padded_image
+    kpts[:, 0] += x_offset
+    kpts[:, 1] += y_offset
+    return padded_image, kpts
 
-def tensor_to_cv2(imgt):
-    imgt = imgt.permute(1,2,0)
-    imgt = imgt.detach().cpu().numpy()
-    imgt = ((imgt)*255).astype(np.uint8)
-    return imgt#kpts
-
-class KptDetector(object):
+class ThetaPreDetector(object):
     def __init__(self,):
         self.net = LAnet().cuda()
-        save_pth = r"contact_the_autor_for_modelweight"
+        save_pth = r"LANet_v1.pkl"
         with open(save_pth, 'rb') as file:
             loaded_params = torch.load(file)
         sub_dict = loaded_params["LANet"]
@@ -34,113 +48,41 @@ class KptDetector(object):
     def forward(self,img):
         rst =self.net(img)
         return rst
-def padding_img(img,padd):
-    K = padd
-    height, width, channels = img.shape
-    new_height = height + 2 * K
-    new_width = width + 2 * K
-    new_image = np.zeros((new_height, new_width, channels), dtype=np.uint8)
-    new_image[K:K + height, K:K + width, :] = img
-    return new_image
 
-def see_dist_map(label):
-    h, w = label.shape
-    contours, _ = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    m = 0;
+def generate_net_ipt(root,imgn):
+    img = cv2.imread(os.path.join(root,imgn))
+    mask = np.where((img == 0), 0, 255)[:, :, 2].astype(np.uint8)
+    center, r = find_circle_inform_hard(mask)
+    h, w, _ = img.shape
+    kpts = np.array([center])
+    mask = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    _, mask = cv2.threshold(mask, 0, 255, cv2.THRESH_BINARY)
+    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    m = 0
     m_area = 0
     for i in range(len(contours)):
         area = cv2.contourArea(contours[i])
         if area > m_area:
-            m = i;
+            m = i
             m_area = area
     contour = contours[m].reshape(-1, 2)
-    xs, ys = np.min(contour, 0)
-    xe, ye = np.max(contour, 0)
-    mid_h = (ys + ye) / 2
-    label = np.zeros((label.shape[0], w)).astype('uint8')
-    mask = cv2.fillPoly(label, [contours[m]], 255)
-    dist_map = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-    return  dist_map,mask,mid_h
+    xs, ys = np.int0(np.min(contour, 0))
+    xe, ye = np.int0(np.max(contour, 0))
+    rotated_img = img[ys:ye, xs:xe]
+    kpts[:, 0] -= xs
+    kpts[:, 1] -= ys
+    rotated_img, rotated_points = center_and_pad_image(rotated_img, kpts)
+    center = rotated_points[0]
+    h, w, _ = rotated_img.shape
+    raw_img = rotated_img.copy()
+    center_changed = np.array([int(center[1] * 56 / w), int(center[0] * 56 / h)])
+    center_hmap = generate_heatmap(center_changed, (56, 56), 2)
+    img = cv2.resize(rotated_img,(56,56))
+    img = np.transpose(img, (2, 0, 1)) / 255.
+    img = torch.from_numpy(img.copy()).float()
+    img[2] = center_hmap
+    return img,raw_img,(int(center[1]), int(center[0]))
 
-def get_center(mask):
-    dist_map,mask,mid_h = see_dist_map(mask)
-    _,max_val,_,center_flag = cv2.minMaxLoc(dist_map)
-    if center_flag[1] < mid_h:
-        dist_map = cv2.rotate(dist_map, cv2.ROTATE_180)
-    good_val = max_val * 0.85
-    good_region = dist_map.copy()
-    good_region[good_region < good_val] = 0
-    good_region[good_region >= good_val] == 255
-    _, radius, _, center = cv2.minMaxLoc(dist_map)
-    center_x,center_y = center
-    good_region = good_region.astype(np.uint8)
-    inner_dist_map = cv2.distanceTransform(good_region, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-    radius = inner_dist_map[center_y,center_x]
-    cv2.circle(good_region,center, int(radius), 0, -1)
-    black_image = np.zeros_like(good_region)
-    black_image[:center_y] = good_region[:center_y]
-    black_image[black_image>0] = 255
-    contours, _ = cv2.findContours(black_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    m = 0;
-    m_area = 0
-    for i in range(len(contours)):
-        area = cv2.contourArea(contours[i])
-        if area > m_area:
-            m = i;
-            m_area = area
-    contour = contours[m]
-    M = cv2.moments(contour)
-    cx = int(M["m10"] / M["m00"])
-    cy = int(M["m01"] / M["m00"])
-    center = (cx,cy)
-    return center
-
-def circle_better(img,mask,rate=1):
-    dist_map,mask,mid_h = see_dist_map(mask)
-    _,max_val,_,center_flag = cv2.minMaxLoc(dist_map)
-    if center_flag[1] < mid_h:
-        img = cv2.rotate(img, cv2.ROTATE_180)
-        mask = cv2.rotate(mask, cv2.ROTATE_180)
-        dist_map = cv2.rotate(dist_map, cv2.ROTATE_180)
-    good_val = max_val * 0.85
-    good_region = dist_map.copy()
-    good_region[good_region < good_val] = 0
-    good_region[good_region >= good_val] == 255
-    _, radius, _, center = cv2.minMaxLoc(dist_map)
-    center_x,center_y = center
-    good_region = good_region.astype(np.uint8)
-    inner_dist_map = cv2.distanceTransform(good_region, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-    radius = inner_dist_map[center_y,center_x]
-    cv2.circle(good_region,center, int(radius), 0, -1)
-    black_image = np.zeros_like(good_region)
-    black_image[:center_y] = good_region[:center_y]
-    black_image[black_image>0] = 255
-    contours, _ = cv2.findContours(black_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    m = 0;
-    m_area = 0
-    for i in range(len(contours)):
-        area = cv2.contourArea(contours[i])
-        if area > m_area:
-            m = i;
-            m_area = area
-    contour = contours[m]
-    M = cv2.moments(contour)
-    cx = int(M["m10"] / M["m00"])
-    cy = int(M["m01"] / M["m00"])
-    center = (cx,cy)
-    circle_map = np.zeros_like(img).astype(np.uint8)
-    r = int(dist_map[cy][cx]) * rate
-    left = center[0] - int(r)
-    right = center[0] + int(r)
-    top = center[1] - int(r)
-    bottom = center[1] + int(r)
-    cv2.circle(circle_map, center, int(r), (255, 255, 255), -1)
-    img = cv2.bitwise_and(img,np.repeat(np.expand_dims(mask, axis=-1), 3, axis=-1))
-    final_circle = cv2.bitwise_and(img, circle_map)
-    pad = int((r - int(dist_map[cy][cx]))/2)
-    final_circle = padding_img(final_circle,pad)
-    final_circle = final_circle[pad+top+1:pad+bottom+1,pad+left+1:pad+right+1]
-    return final_circle
 def get_inter_square(img,Rotate_theta):
     h,w,_ = img.shape
     center = (w//2,h//2)
@@ -150,87 +92,47 @@ def get_inter_square(img,Rotate_theta):
     top = center[1] - int(width)
     bottom = center[1] + int(width)
     mat = cv2.getRotationMatrix2D(center,Rotate_theta,scale=1)
-    rotated_img = cv2.warpAffine(img,mat,(w,h)) 
+    rotated_img = cv2.warpAffine(img,mat,(w,h))
     square_roi = rotated_img[top:bottom,left:right]
     return square_roi,rotated_img
 
-detector = KptDetector()
+detector = ThetaPreDetector()
 
-def process_single_img_ipt(imgn):
-    img = cv2.imread(os.path.join(root_dir,imgn))
-    h, w, _ = img.shape
-    img_for_detect = img.copy()
-    mask = np.where((img[:,:,2]<20),0,255).astype(np.uint8)
-    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    m = 0;
-    m_area = 0
-    for i in range(len(contours)):
-        area = cv2.contourArea(contours[i])
-        if area > m_area:
-            m = i;
-            m_area = area
-    counter = contours[m].reshape(-1, 2)
-
-    xs, ys = np.int0(np.min(counter, 0))
-    xe, ye = np.int0(np.max(counter, 0))
-
-    img = img[ys:ye, xs:xe]
-    img_for_detect = img_for_detect[ys:ye, xs:xe]
-
-    raw_img = center_and_pad_image(img)
-    raw_img_detect = center_and_pad_image(img_for_detect)
-
-    gray1_detect = cv2.cvtColor(raw_img_detect.copy(), cv2.COLOR_BGR2GRAY)
-    gray1_detect = np.expand_dims(gray1_detect, axis=-1)
-    gray1_detect = np.repeat(gray1_detect, 3, axis=-1)
-    imgh, imgw, _ = gray1_detect.shape
-    train_size = (56,56)
-    img = cv2.resize(gray1_detect,train_size)
-    img = np.transpose(img, (2, 0, 1)) / 255.
-    img = torch.from_numpy(img.copy()).float()
-    img = img.unsqueeze(0).cuda()
-    rst=detector.forward(img)
-    img_cv2 = tensor_to_cv2(img[0].cpu())
-    points = rst.detach().cpu().reshape(-1, 2)
-    points = (points + 1) * (imgh/2)
-    raw_mask = np.where((raw_img[:,:,2]<20),0,255).astype(np.uint8)
-    pt = points.numpy()
-    mean_pt = np.mean(pt, axis=0)
-    mean_pt = (int(mean_pt[0]),int(mean_pt[1]))
-    center = get_center(raw_mask)
-    lenb = np.linalg.norm(np.array(center) - np.array(mean_pt))
-    sintheta =  (mean_pt[0] - center[0])/lenb
-    radians = np.arcsin(sintheta)
-    angle_degrees = np.degrees(radians)
-    height, width = raw_img.shape[:2]
-    rotation_matrix = cv2.getRotationMatrix2D(center,angle_degrees, 1.0)
-    rotated_image = cv2.warpAffine(raw_img, rotation_matrix, (width, height))
-    rotated_mask = cv2.warpAffine(raw_mask, rotation_matrix, (width, height))
-    final_circle, visualize_circle = circle_better(rotated_image,rotated_mask,rate=1.1)
+def process_single_img_ipt(save_dir_visualize,save_dir_square,root_dir,imgn):
+    tensor_for_ipt,raw_img,r_center = generate_net_ipt(root_dir,imgn)
+    tensor_for_ipt = tensor_for_ipt.unsqueeze(0).cuda()
+    theta = detector.forward(tensor_for_ipt).detach().cpu()[0]
+    theta = theta.numpy()
+    angle_degrees = np.degrees(theta * np.pi)
+    angle_degrees = float(angle_degrees)
+    rotation_matrix = cv2.getRotationMatrix2D(r_center,angle_degrees, scale=1.0)
+    rawimg = cv2.warpAffine(raw_img, rotation_matrix,(raw_img.shape[1], raw_img.shape[0]))
+    rawimg = padding_img(rawimg,20)
+    raw_mask = np.where((rawimg <= 10),0,255)[:, :, 2].astype(np.uint8)
+    visualize_img = rawimg.copy()
+    final_circle, visualize_circle = circle_better(rawimg,visualize_img,raw_mask,rate=1.1)
     imgn = imgn.split(".")[0]
-    h, w, _ = visualize_circle.shape
+    h,w, _ = visualize_circle.shape
+    visualize_save_iname = imgn + ".jpg"
+    visualize_circle = cv2.resize(visualize_circle, (int(200 * w / h), 200))
+    cv2.imwrite(os.path.join(save_dir_visualize,visualize_save_iname),visualize_circle)
     try:
         for angle in range(-30, 30, 3):
             square_roi,circle_roi = get_inter_square(final_circle, angle)
             save_iname = imgn + "_" + str(angle) + ".jpg"
             square_roi_128 = cv2.resize(square_roi,(128,128))
-            cv2.imwrite(os.path.join(save_dir, save_iname), square_roi_128)
+            cv2.imwrite(os.path.join(save_dir_square, save_iname), square_roi_128)
     except Exception as e:
         print(e)
 
+
 if __name__ == '__main__':
-
-    root_dir = r"/tmp/data/HIT"
+    root_dir = r"/tmp/NTUv2detection/Theta_predict/Datas/HIT"#
+    save_dir_visualize = "Datas/ROIS/MPD/visualize"
+    save_dir_square = "Datas/ROIS/HIT"
+    mask_save_dir = "Datas/ROIS/HIT/visualize_mask"
     imgns = os.listdir(root_dir)
-    cnt = 0
     total_len = len(imgns)
-    for imgn in imgns:
-        cnt += 1
-        print(cnt)
-        if cnt%100 == 0:
-            print(cnt)
-        process_single_img_ipt(imgn)
-
-
-
+    for imgn in tqdm.tqdm(imgns):
+        process_single_img_ipt(save_dir_visualize,save_dir_square,root_dir,imgn)
 

@@ -9,7 +9,7 @@ save_dir = ''
 
 def center_and_pad_image(input_img_cv2):
     height, width, _ = input_img_cv2.shape
-    new_size = int(max(width, height))  # + 2 * border_width
+    new_size = int(max(width, height))
     x_offset = (new_size - width) // 2
     y_offset = (new_size - height) // 2
     padded_image = np.zeros((new_size, new_size, 3), dtype=np.uint8)
@@ -161,7 +161,7 @@ def process_single_img_ipt(imgn):
     h, w, _ = img.shape
     img_for_detect = img.copy()
     mask = np.where((img[:,:,2]<20),0,255).astype(np.uint8)
-    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 用mask找到轮廓点组
+    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     m = 0;
     m_area = 0
     for i in range(len(contours)):

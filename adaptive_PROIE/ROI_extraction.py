@@ -36,23 +36,19 @@ class KptDetector(object):
         return rst
 def padding_img(img,padd):
     K = padd
-    # 获取原始图像的尺寸
     height, width, channels = img.shape
-    # 计算新图像的尺寸
     new_height = height + 2 * K
     new_width = width + 2 * K
-    # 创建新的黑色图像
     new_image = np.zeros((new_height, new_width, channels), dtype=np.uint8)
-    # 将原始图像放置在新图像中心
     new_image[K:K + height, K:K + width, :] = img
     return new_image
 
 def see_dist_map(label):
     h, w = label.shape
-    contours, _ = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 用mask找到轮廓点组
+    contours, _ = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     m = 0;
     m_area = 0
-    for i in range(len(contours)):  # 检测出最大的轮廓
+    for i in range(len(contours)):
         area = cv2.contourArea(contours[i])
         if area > m_area:
             m = i;
@@ -62,7 +58,7 @@ def see_dist_map(label):
     xe, ye = np.max(contour, 0)
     mid_h = (ys + ye) / 2
     label = np.zeros((label.shape[0], w)).astype('uint8')
-    mask = cv2.fillPoly(label, [contours[m]], 255)  # 填充轮廓外部分为黑色
+    mask = cv2.fillPoly(label, [contours[m]], 255)
     dist_map = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
     return  dist_map,mask,mid_h
 
@@ -84,10 +80,10 @@ def get_center(mask):
     black_image = np.zeros_like(good_region)
     black_image[:center_y] = good_region[:center_y]
     black_image[black_image>0] = 255
-    contours, _ = cv2.findContours(black_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 用mask找到轮廓点组
+    contours, _ = cv2.findContours(black_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     m = 0;
     m_area = 0
-    for i in range(len(contours)):  # 检测出最大的轮廓
+    for i in range(len(contours)):
         area = cv2.contourArea(contours[i])
         if area > m_area:
             m = i;
@@ -119,15 +115,15 @@ def circle_better(img,mask,rate=1):
     black_image = np.zeros_like(good_region)
     black_image[:center_y] = good_region[:center_y]
     black_image[black_image>0] = 255
-    contours, _ = cv2.findContours(black_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 用mask找到轮廓点组
+    contours, _ = cv2.findContours(black_image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     m = 0;
     m_area = 0
-    for i in range(len(contours)):  # 检测出最大的轮廓
+    for i in range(len(contours)):
         area = cv2.contourArea(contours[i])
         if area > m_area:
             m = i;
             m_area = area
-    contour = contours[m]#.reshape(-1, 2)
+    contour = contours[m]
     M = cv2.moments(contour)
     cx = int(M["m10"] / M["m00"])
     cy = int(M["m01"] / M["m00"])
@@ -153,8 +149,8 @@ def get_inter_square(img,Rotate_theta):
     right = center[0] + int(width)
     top = center[1] - int(width)
     bottom = center[1] + int(width)
-    mat = cv2.getRotationMatrix2D(center,Rotate_theta,scale=1)  # random.uniform(0.8,1)
-    rotated_img = cv2.warpAffine(img,mat,(w,h))  # ,flags = cv2.INTER_NEAREST)
+    mat = cv2.getRotationMatrix2D(center,Rotate_theta,scale=1)
+    rotated_img = cv2.warpAffine(img,mat,(w,h)) 
     square_roi = rotated_img[top:bottom,left:right]
     return square_roi,rotated_img
 
@@ -168,7 +164,7 @@ def process_single_img_ipt(imgn):
     contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 用mask找到轮廓点组
     m = 0;
     m_area = 0
-    for i in range(len(contours)):  # 检测出最大的轮廓
+    for i in range(len(contours)):
         area = cv2.contourArea(contours[i])
         if area > m_area:
             m = i;
@@ -195,7 +191,6 @@ def process_single_img_ipt(imgn):
     img = img.unsqueeze(0).cuda()
     rst=detector.forward(img)
     img_cv2 = tensor_to_cv2(img[0].cpu())
-    #cv2.imwrite(os.path.join(net_ipt_visualize,imgn),img_cv2)
     points = rst.detach().cpu().reshape(-1, 2)
     points = (points + 1) * (imgh/2)
     raw_mask = np.where((raw_img[:,:,2]<20),0,255).astype(np.uint8)

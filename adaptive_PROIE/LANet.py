@@ -4,7 +4,7 @@ import torch.functional as F
 
 vgg16 = torchvision.models.vgg16(pretrained=False)
 class LAnet(nn.Module):
-    def __init__(self,numclasses=4,ipt_size = 56):
+    def __init__(self,numclasses=1,ipt_size = 56):
         super(LAnet,self).__init__()
         self.input_w = ipt_size
         self.input_h = ipt_size
@@ -18,7 +18,10 @@ class LAnet(nn.Module):
             nn.LeakyReLU(negative_slope=0.1),
             nn.Dropout(p=0.1),
             nn.Linear(128,numclasses),
+            nn.Tanh(),
         )
+
+
     def forward(self,x):
         out = self.vgg_p3(x)
         out = self.extra(out)

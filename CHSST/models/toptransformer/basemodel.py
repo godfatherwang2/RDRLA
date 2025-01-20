@@ -708,10 +708,7 @@ class Topformernet(nn.Module):
         super(Topformernet, self).__init__()
         self.topformer = Topformer(cfgs=model_cfgs.get("cfg"),channels=model_cfgs.get("channels"),
                                    out_channels=[None, 256, 256, 256],embed_out_indice=model_cfgs.get("embed_out_indice"),
-                                   init_cfg=dict(
-                                       type='Pretrained',
-                                       checkpoint='/mnt/wx/palm/detection/net/toptransformer/TopFormer-T_448x448_4x8_160k-33.4.pth')
-                                   ,injection=True
+                                   injection=True
                                    )
         self.seghead = SimpleHead()
     def forward(self,x):

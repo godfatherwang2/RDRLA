@@ -2,7 +2,7 @@ import torch
 import time
 from torch.utils.data import DataLoader
 import torch.nn as nn
-from adaptive_PROIE.LANet import LAnet
+from models import LAnet
 from dataset import Rotate_Angle_Dataset,Rotate_Angle_Visualize_Dataset
 import os
 from torchvision import transforms

@@ -3,8 +3,9 @@ import torch
 import os
 import cv2
 import tqdm
+from CHSST.models.toptransformer.basemodel import Topformernet
 
-def process_one_img(rawpth,destpth,model,kpts):
+def process_one_img(rawpth,destpth,model,kpts,device="cuda"):
     img = cv2.imread(rawpth)
     sx = rawpth.split("_")[-1][0]
     h, w, _ = img.shape
@@ -17,12 +18,11 @@ def process_one_img(rawpth,destpth,model,kpts):
             img = cv2.rotate(img,cv2.ROTATE_90_CLOCKWISE)
     imgIPT = img.copy() #cv2.cvtColor(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),cv2.COLOR_GRAY2BGR)
     h, w, _ = img.shape
-    s = 1
     inputimg = cv2.resize(imgIPT,(448,448))
     indata = np.transpose(inputimg, (2, 0, 1)) / 255.
     indata = torch.tensor(indata).float().unsqueeze(0)
-    indata = indata.to(DEVICE)
-    output = model[s](indata)
+    indata = indata.to(device)
+    output = model(indata)
     res = output[0].data.cpu().numpy()
     res = np.expand_dims(res.argmax(axis=0), 2) * 255
     res = np.repeat(res,3,2)
@@ -34,10 +34,12 @@ def process_one_img(rawpth,destpth,model,kpts):
 
 def segfile():
     sourcefile_list = [r"/data1/wx/palm/detection/data/MPD_RAW",]
+    
+    model = Topformernet().cuda()
+    model.load_state_dict(torch.load(r"CHSST_checkpoints\EP7-iou0.951562-pacc0.977916.pth"))
+    
     for sourcefile in sourcefile_list:
         out_file = r"/data1/wx/palm/detection/data/MPD/"
-        model = [0, 1]
-        model[1] = torch.load('../TrainRec/EP7-iou0.995669-pacc0.994628.pth').cuda().eval()#torch.load('../TrainRec/P2/Topformer/EP5-iou0.981480-pacc0.991760.pth').cuda().eval()
         all_imgs = os.listdir(sourcefile)
         needed_list = [i for i in all_imgs]#if int(i.split("_")[0])<=75]
         count = 0
@@ -47,13 +49,13 @@ def segfile():
             o = process_one_img(rawpth=raw_pth, destpth=out_pth, model=model, kpts=None)
             h, w, _ = o.shape
             w = int(w / 2)
-            p_img = o[:, :w].astype(np.uint8)  # 3*86*59
+            p_img = o[:, :w].astype(np.uint8)
             raw_label = o[:, w:].astype(np.uint8)
-            label = o[:, w:][:, :, 0].astype(np.uint8)  # 86*59
-            contours, _ = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 用mask找到轮廓点组
+            label = o[:, w:][:, :, 0].astype(np.uint8)
+            contours, _ = cv2.findContours(label.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
             m = 0;
             m_area = 0
-            for i in range(len(contours)):  # 检测出最大的轮廓
+            for i in range(len(contours)):
                 area = cv2.contourArea(contours[i])
                 if area > m_area:
                     m = i;

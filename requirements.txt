@@ -4,5 +4,5 @@ opencv-python
 pillow
 numpy
 scipy
-mmseg
-mmcv
+mmseg==0.20.0
+mmcv==1.4.0
